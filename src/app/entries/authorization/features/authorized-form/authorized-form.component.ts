@@ -18,6 +18,9 @@ import { OwnerPlotHistoryDTO } from '../../../../users/models/ownerXplot';
 import { Contact, Owner } from '../../../../users/models/owner';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { PlotsByOwnerService } from '../../../services/authorized-range/plots-by-owner.service';
+import { UserService } from '../../../../users/services/user.service';
+import { SessionService } from '../../../../users/services/session.service';
+import { Role, URLTargetType } from '../../../../users/models/role';
 
 @Component({
   selector: 'app-auth-form',
@@ -47,8 +50,11 @@ export class AuthFormComponent implements OnInit {
   private plotsCache = new BehaviorSubject<Plot[]>([]);
   isLoaded = true;
 
-  ownerPlotService = inject(PlotsByOwnerService);
+  plotsByOwnerService = inject(PlotsByOwnerService);
+  ownerPlotService = inject(OwnerPlotService);
   plotsservice = inject(PlotService);
+  userService = inject(UserService);
+  sessionService = inject(SessionService)
   plotsFromService : Plot[] = [] 
 
   constructor(private fb: FormBuilder, private authService: AuthService, private router: Router, 
@@ -316,7 +322,80 @@ export class AuthFormComponent implements OnInit {
 
     // Si no hay plots cacheados, creamos un nuevo observable
     const plotsObservable = new BehaviorSubject<plot[]>([]);
+    const user = this.sessionService.getItem('user');
+    const isOwner = user?.roles?.some((role: Role) => role.code === URLTargetType.OWNER);
     
+    if (isOwner && user?.ownerId) {
+      this.ownerPlotService.giveAllPlotsByOwner(user.ownerId, 0, 2147483647).subscribe({
+        next: (data) => {
+          if (!data?.content) {
+            console.warn('no hay lotes para el propietario');
+            plotsObservable.next([]);
+            return;
+          }
+
+          this.plotsFromService = data.content;
+          const tempPlots: plot[] = [];
+          
+          const ownerPromises = this.plotsFromService.map(element => 
+            new Promise<void>((resolve) => {
+              if (!element?.id) {
+                resolve();
+                return;
+              }
+
+              this.ownerPlotService.giveActualOwner(element.id).subscribe({
+                next: (ownerData) => {
+                  if (ownerData?.firstName && 
+                      ownerData?.lastName && 
+                      ownerData?.contacts && 
+                      Array.isArray(ownerData.contacts) && 
+                      ownerData.contacts.length > 0) {
+                    
+                    const plotData = {
+                      id: element.id,
+                      desc: '',
+                      contacts: ownerData.contacts,
+                      name: `${element.plotNumber}- ${element.blockNumber} - ${ownerData.firstName} ${ownerData.lastName}`
+                    };
+                    tempPlots.push(plotData);
+                  }
+                  resolve();
+                },
+                error: (err) => {
+                  console.error(`Error obteniendo datos del propietario para el lote ${element.id}:`, err);
+                  resolve();
+                }
+              });
+            })
+          );
+
+          Promise.all(ownerPromises).then(() => {
+            tempPlots.sort((a, b) => {
+              const numA = parseInt(a.name.split('-')[0].trim()) || 0;
+              const numB = parseInt(b.name.split('-')[0].trim()) || 0;
+              return numA - numB;
+            });
+            
+            this.plots$.next(tempPlots);
+            plotsObservable.next(tempPlots);
+          }).catch(err => {
+            console.error('Error procesando lotes:', err);
+            this.plots$.next([]);
+            plotsObservable.next([]);
+          });
+        },
+        error: (err) => {
+          console.error('Error obteniendo los lotes del propietario:', err);
+          this.toastService.sendError("Error al obtener lotes, cargue manualmente.")
+          this.isLoaded = false;
+          this.plots$.next([]);
+          plotsObservable.next([]);
+        }
+      });
+    } 
+
+
     this.plotsservice.getAllPlots(0, 2147483647, true).subscribe({
       next: (data) => {
         console.log('get all ' + data)
@@ -336,7 +415,7 @@ export class AuthFormComponent implements OnInit {
               return;
             }
 
-            this.ownerPlotService.actualOwnerByPlot(element.id).subscribe({
+            this.plotsByOwnerService.actualOwnerByPlot(element.id).subscribe({
               next: (ownerData) => {
                 console.log(ownerData);
                 // Verificar que tenga owner con firstName, lastName y al menos un contacto
