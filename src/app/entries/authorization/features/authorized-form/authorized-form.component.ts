@@ -314,7 +314,7 @@ export class AuthFormComponent implements OnInit {
     this.router.navigate(['/entries/auth-list']);
   }
 
-  /*initPlots() {
+  initPlots() {
     // Si ya tenemos plots cacheados, retornamos el observable
     if (this.plotsCache.value.length > 0) {
       return this.plotsCache.asObservable();
@@ -393,183 +393,81 @@ export class AuthFormComponent implements OnInit {
           plotsObservable.next([]);
         }
       });
-    } 
-
-
-    this.plotsservice.getAllPlots(0, 2147483647, true).subscribe({
-      next: (data) => {
-        console.log('get all ' + data)
-        if (!data?.content) {
-          console.warn('no hay lotes');          
-          plotsObservable.next([]);
-          return;
-        }
-      
-        this.plotsFromService = data.content;
-        const tempPlots: plot[] = [];
+    } else {
+      this.plotsservice.getAllPlots(0, 2147483647, true).subscribe({
+        next: (data) => {
+          console.log('get all ' + data)
+          if (!data?.content) {
+            console.warn('no hay lotes');          
+            plotsObservable.next([]);
+            return;
+          }
         
-        const ownerPromises = this.plotsFromService.map(element => 
-          new Promise<void>((resolve) => {
-            if (!element?.id) {
-              resolve();
-              return;
-            }
-
-            this.plotsByOwnerService.actualOwnerByPlot(element.id).subscribe({
-              next: (ownerData) => {
-                console.log(ownerData);
-                // Verificar que tenga owner con firstName, lastName y al menos un contacto
-                if (ownerData?.owner?.firstName && 
-                    ownerData?.owner?.lastName && 
-                    ownerData?.owner?.contacts && 
-                    Array.isArray(ownerData.owner.contacts) && 
-                    ownerData.owner.contacts.length > 0) {
-                  
-                  const plotData = {
-                    id: element.id,
-                    desc: '',
-                    contacts: ownerData.owner.contacts,
-                    name: `${element.plotNumber}- ${element.blockNumber} - ${ownerData.owner.firstName} ${ownerData.owner.lastName}`
-                  };
-                  tempPlots.push(plotData);
-                }
-                resolve();
-              },
-              error: (err) => {
-                console.error(`Error obteniendo dueños para el lote ${element.id}:`, err);
-                resolve();
-              }
-            });
-          })
-        );
-
-        Promise.all(ownerPromises).then(() => {
-          // Ordenar los plots por número
-          tempPlots.sort((a, b) => {
-            const numA = parseInt(a.name.split('-')[0].trim()) || 0;
-            const numB = parseInt(b.name.split('-')[0].trim()) || 0;
-            return numA - numB;
-          });
+          this.plotsFromService = data.content;
+          const tempPlots: plot[] = [];
           
-          this.plots$.next(tempPlots);
-          plotsObservable.next(tempPlots);
-        }).catch(err => {
-          console.error('Error procesando lotes:', err);
+          const ownerPromises = this.plotsFromService.map(element => 
+            new Promise<void>((resolve) => {
+              if (!element?.id) {
+                resolve();
+                return;
+              }
+  
+              this.plotsByOwnerService.actualOwnerByPlot(element.id).subscribe({
+                next: (ownerData) => {
+                  console.log(ownerData);
+                  // Verificar que tenga owner con firstName, lastName y al menos un contacto
+                  if (ownerData?.owner?.firstName && 
+                      ownerData?.owner?.lastName && 
+                      ownerData?.owner?.contacts && 
+                      Array.isArray(ownerData.owner.contacts) && 
+                      ownerData.owner.contacts.length > 0) {
+                    
+                    const plotData = {
+                      id: element.id,
+                      desc: '',
+                      contacts: ownerData.owner.contacts,
+                      name: `${element.plotNumber}- ${element.blockNumber} - ${ownerData.owner.firstName} ${ownerData.owner.lastName}`
+                    };
+                    tempPlots.push(plotData);
+                  }
+                  resolve();
+                },
+                error: (err) => {
+                  console.error(`Error obteniendo dueños para el lote ${element.id}:`, err);
+                  resolve();
+                }
+              });
+            })
+          );
+  
+          Promise.all(ownerPromises).then(() => {
+            // Ordenar los plots por número
+            tempPlots.sort((a, b) => {
+              const numA = parseInt(a.name.split('-')[0].trim()) || 0;
+              const numB = parseInt(b.name.split('-')[0].trim()) || 0;
+              return numA - numB;
+            });
+            
+            this.plots$.next(tempPlots);
+            plotsObservable.next(tempPlots);
+          }).catch(err => {
+            console.error('Error procesando lotes:', err);
+            this.plots$.next([]);
+            plotsObservable.next([]);
+          });
+        },
+        error: (err) => {
+          console.error('Error obteniendo los lotes:', err);
+          this.toastService.sendError("Error al obtener lotes, cargue manualmente.")
+          this.isLoaded = false;
           this.plots$.next([]);
           plotsObservable.next([]);
-        });
-      },
-      error: (err) => {
-        console.error('Error obteniendo los lotes:', err);
-        this.toastService.sendError("Error al obtener lotes, cargue manualmente.")
-        this.isLoaded = false;
-        this.plots$.next([]);
-        plotsObservable.next([]);
-      }
-    });
+        }
+      });
+    }
 
     return plotsObservable.asObservable();
-}*/
-
-initPlots() {
-  // Si ya tenemos plots cacheados, retornamos el observable
-  if (this.plotsCache.value.length > 0) {
-    return this.plotsCache.asObservable();
-  }
-
-  const plotsObservable = new BehaviorSubject<plot[]>([]);
-  const user = this.sessionService.getItem('user');
-  const isOwner = user?.roles?.some((role: Role) => role.code === URLTargetType.OWNER);
-  
-  const service = isOwner ? this.ownerPlotService : this.plotsservice;
-  const method = isOwner ? 
-    () => this.ownerPlotService.giveAllPlotsByOwner(user.ownerId, 0, 2147483647) :
-    () => this.plotsservice.getAllPlots(0, 2147483647, true);
-
-  const formatPlotData = (element: Plot, ownerData: any): plot => {
-    return {
-      id: element.id,
-      desc: '',
-      contacts: ownerData.contacts || ownerData.owner?.contacts || [],
-      name: `${element.plotNumber}- ${element.blockNumber} - ${
-        ownerData.firstName || ownerData.owner?.firstName
-      } ${ownerData.lastName || ownerData.owner?.lastName}`
-    };
-  };
-
-  const isValidOwnerData = (ownerData: any): boolean => {
-    const owner = ownerData.owner || ownerData;
-    return owner?.firstName && 
-           owner?.lastName && 
-           owner?.contacts && 
-           Array.isArray(owner.contacts) && 
-           owner.contacts.length > 0;
-  };
-
-  const processPlotData = async (plotElement: Plot, service: any): Promise<plot | null> => {
-    if (!plotElement?.id) return null;
-    
-    try {
-      const ownerData = await firstValueFrom(service.actualOwnerByPlot(plotElement.id));
-      
-      if (isValidOwnerData(ownerData)) {
-        return formatPlotData(plotElement, ownerData);
-      }
-    } catch (error) {
-      console.error(`Error obteniendo datos para el lote ${plotElement.id}:`, error);
-    }
-    return null;
-  };
-
-  const sortPlots = (plots: plot[]): plot[] => {
-    return plots.sort((a, b) => {
-      const numA = parseInt(a.name.split('-')[0].trim()) || 0;
-      const numB = parseInt(b.name.split('-')[0].trim()) || 0;
-      return numA - numB;
-    });
-  };
-
-  const handleError = (error: any, message: string = "Error al obtener lotes, cargue manualmente.") => {
-    console.error(message, error);
-    this.toastService.sendError(message);
-    this.isLoaded = false;
-    this.plots$.next([]);
-    return [];
-  };
-
-  method().subscribe({
-    next: async (data) => {
-      if (!data?.content) {
-        console.warn('No hay lotes disponibles');
-        plotsObservable.next([]);
-        return;
-      }
-
-      this.plotsFromService = data.content;
-      const plotPromises = this.plotsFromService.map(element => 
-        processPlotData(element, isOwner ? this.ownerPlotService : this.plotsByOwnerService)
-      );
-
-      try {
-        const processedPlots = (await Promise.all(plotPromises))
-          .filter((plot): plot is plot => plot !== null);
-        
-        const sortedPlots = sortPlots(processedPlots);
-        this.plots$.next(sortedPlots);
-        plotsObservable.next(sortedPlots);
-      } catch (error) {
-        handleError(error, "Error procesando los datos de los lotes");
-      }
-    },
-    error: (error) => {
-      handleError(error, isOwner ? 
-        "Error obteniendo los lotes del propietario" : 
-        "Error obteniendo todos los lotes"
-      );
-    }
-  });
-
-  return plotsObservable.asObservable();
 }
 
   onPlotSelected(selectedPlot: plot) {
