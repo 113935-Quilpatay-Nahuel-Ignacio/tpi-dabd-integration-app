@@ -9,6 +9,7 @@
         [props]="props"
         [dictionaries]="dictionaries"
         [tableFilters]="filterConfig"
+        [showNewButtton]="false"
         [modalComponent]="EntityFormComponent"
         (entityCreatedInModal)="updateEntityList()"
         (filterValueChange)="onFilterValueChange($event)"
