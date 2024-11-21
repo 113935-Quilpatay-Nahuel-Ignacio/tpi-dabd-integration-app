@@ -32,6 +32,7 @@ export class AuthService {
   getRoleCode(){
     const user =  this.sessionService.getItem('user');
     
+    console.log(user +'userrr')
     for(let r of user.roles){
       console.log(r);
       if(r.code === 102 || r.code === 999){
@@ -82,33 +83,38 @@ export class AuthService {
       .pipe(map((response) => this.caseTransformer.toCamelCase(response)));
   }
 
-  getAll(page: number, size: number, isActive?: boolean): Observable<Auth[]> {
+  getAll(page: number, size: number, isActive?: boolean, createdUser?: number): Observable<Auth[]> {
     const currentUser = this.sessionService.getItem('user');
-    
+  
+    console.log("currentUser", currentUser);
+  
     if (!currentUser || !currentUser.roles) {
       return new Observable<Auth[]>(subscriber => subscriber.next([]));
     }
-
-    const isOwner = currentUser.roles.some((role: Role) => role.name === 'OWNER');
-    
-    const params = this.caseTransformer.toSnakeCase({
-      size: 100000,
+  
+    const isOwner = currentUser.roles.some((role: Role) => role.name === 'OWNER' || role.code === 102);
+  
+    // Inicializar los parámetros base
+    let params: any = this.caseTransformer.toSnakeCase({
+      page,
+      size,
       isActive,
     });
+  
+    
+    if (isOwner) {
+      createdUser = currentUser.id;
+      params = {
+        ...params, 
+        createdUser: createdUser
+      };
+    }
 
     return this.http
-      .get<Auth[]>(this.apiUrl, {
-        params: params as any,
-      })
+      .get<Auth[]>(this.apiUrl, { params: params as any })
       .pipe(
         map((response) => {
-          let auths = response.map((item) => this.caseTransformer.toCamelCase(item));
-          
-          if (isOwner) {
-            auths = auths.filter(auth => auth.authorizerId === currentUser.id);
-          }
-          
-          return auths;
+          return response.map((item) => this.caseTransformer.toCamelCase(item));
         })
       );
   }

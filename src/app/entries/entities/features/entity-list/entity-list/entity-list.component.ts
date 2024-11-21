@@ -166,13 +166,13 @@ export class EntityListComponent implements OnInit, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    this.filterComponent.filter$.subscribe((filter: string) => {
+  /*  this.filterComponent.filter$.subscribe((filter: string) => {
       this.getAllFiltered(filter);
     });
     this.userType = this.userTypeService.getType();
     this.userTypeService.userType$.subscribe((userType: string) => {
       this.userType = userType;
-    });
+    });*/
   }
 
   //#endregion
@@ -204,7 +204,6 @@ export class EntityListComponent implements OnInit, AfterViewInit {
   }
 
   getAllFiltered(filter: string) {
-    //this.visitorService.getAllPaginated(this.currentPage, this.pageSize, {active : undefined , textFilter : filter})
     this.visitorService.getAllFiltered(filter)
       .subscribe({
         next: (data) => {

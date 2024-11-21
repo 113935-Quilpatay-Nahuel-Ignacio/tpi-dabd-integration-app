@@ -101,6 +101,17 @@ export class AccessFormComponent implements OnInit {
       }
     });
 
+      // Subscribe to changes in the vehicleType control
+      this.accessForm.get('vehicleType')?.valueChanges.subscribe((value) => {
+        const vehicleRegControl = this.accessForm.get('vehicleReg');
+        if (value === 'FOOT') {
+          vehicleRegControl?.disable(); // Disable the input
+          vehicleRegControl?.reset(); // Optionally reset its value
+        } else {
+          vehicleRegControl?.enable(); // Enable the input
+        }
+      });
+
 
     const lote = this.url.snapshot.queryParamMap.get('lote');
     const docNumber = this.url.snapshot.queryParamMap.get('docNumber');
