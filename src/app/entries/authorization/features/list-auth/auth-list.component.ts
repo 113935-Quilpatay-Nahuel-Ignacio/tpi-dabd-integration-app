@@ -133,15 +133,7 @@ export class AuthListComponent  implements OnInit, AfterViewInit {
       if (this.userType === "GUARD") {
         filteredData = filteredData.filter(x => x.isActive);
       }
-
-      // Procesar los datos filtrados
-    /*  filteredData.forEach(date => {
-        date.authorizer = this.authorizerCompleterService.completeAuthorizer(date.authorizerId);
-        if (date.authorizer === undefined) {
-          date.authorizer = this.authorizerCompleterService.completeAuthorizer(1);
-        }
-      });*/
-
+    
       // Transformar y actualizar la vista
       this.completeList = this.transformLotListToTableData(filteredData);
       let response = this.transformResponseService.transformResponse(
@@ -227,20 +219,7 @@ export class AuthListComponent  implements OnInit, AfterViewInit {
   //#region GET_ALL
   getAll() {
     this.authService.getAll(this.currentPage, this.pageSize, this.retrieveByActive).subscribe(data => {
-            if(this.userType === "OWNER"){
-                data = data.filter(x => x.plotId == 2)
-            }
-            if(this.userType === "GUARD"){
-                data = data.filter(x => x.isActive)
-            }
-            console.log(data)
-        
-            /*data.forEach(date => {
-          date.authorizer = this.authorizerCompleterService.completeAuthorizer(date.authorizerId)
-          if (date.authorizer === undefined){
-            date.authorizer = this.authorizerCompleterService.completeAuthorizer(1)
-          }
-        })*/
+        console.log(data + "data del ts")
         this.completeList = this.transformLotListToTableData(data);
         let response = this.transformResponseService.transformResponse(data,this.currentPage, this.pageSize, this.retrieveByActive)
 

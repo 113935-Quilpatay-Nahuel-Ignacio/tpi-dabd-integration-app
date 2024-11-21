@@ -10,6 +10,7 @@ import { SendVisitor, Visitor } from '../../models/visitors/visitor.model';
 import { CaseTransformerService } from '../case-transformer.service';
 import { environment } from '../../../../environments/environment.prod';
 import { SessionService } from '../../../users/services/session.service';
+import { Role } from '../../../users/models/role';
 
 export interface VisitorFilter {
   active?: boolean;
@@ -41,9 +42,9 @@ export class VisitorService {
   getAll(
     page: number,
     size: number,
-    filter?: boolean
+    filter?: boolean, 
   ): Observable<{ items: Visitor[] }> {
-    
+
     const params = this.caseTransformer.toSnakeCase({
       page,
       size,
@@ -66,14 +67,33 @@ export class VisitorService {
   getAllPaginated(
     page?: number,
     size?: number,
-    filter?: VisitorFilter
+    filter?: VisitorFilter,
+    createdUser?: number
   ): Observable<PaginatedResponse<Visitor>> {
+    
     let snakeCaseParams = this.caseTransformer.toSnakeCase({
       page: page?.toString(),
       size: size?.toString(),
       filter,
     });
+    
+    const user = this.sessionService.getItem('user');
+    const isOwner = user.roles.some((role : Role) => role.code === 102 || role.name === 'OWNER');
+    console.log(user.id);
+    console.log('es own '+ isOwner);
 
+    if(isOwner){
+      console.log('entro')
+      createdUser = user.id;
+      snakeCaseParams = {
+        ...snakeCaseParams, 
+        createdUser
+      }
+      
+    }
+
+    console.log(snakeCaseParams.createdUser);
+    
     return this.http
       .get<{ items: Visitor[]; total_elements: number }>(
         this.apiUrl + 'visitors',
